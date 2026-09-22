@@ -42,7 +42,7 @@ typedef struct {
     int statusCode;
     char reason[64];
     char server[64];
-    char body[2048];
+    char body[4096];
     Headers headers;
 } HTTP_Response;
 
@@ -50,7 +50,7 @@ typedef struct {
 typedef struct {
     char *method;
     char *path;
-    Acition_Result* (*handler)(const HTTP_Request * request)
+    Action_Result* (*handler)(const HTTP_Request * request)
 } Route;
 
 // Action_Result : function result struct
@@ -59,7 +59,7 @@ typedef struct {
     char *body;
     size_t body_len;
     const char *content_type;
-} Acition_Result;
+} Action_Result;
 
 
 // safe_strncpy : helper function to safely copy n bytes, without code duplication
@@ -67,6 +67,17 @@ static void safe_strncpy(char *dest, const char *src, size_t dest_size)
 {
     strncpy(dest, src, dest_size - 1);
     dest[dest_size - 1] = '\0';
+    return NULL;
+}
+
+static void malloc_check(void *ptr)
+{
+    if (ptr == NULL)
+    {
+        perror("malloc : failed to allocate memory");
+        exit(EXIT_FAILURE);
+    }
+    return NULL;
 }
 
 char *server_root(void)
@@ -242,48 +253,48 @@ Route *route_resolver(Route *route)
     return NULL;
 }
 
-Acition_Result *route_handler(const Route* route, const HTTP_Request *request, Acition_Result *action_result)
+Action_Result *route_handler(const Route* route, const HTTP_Request *request, Action_Result *action_result)
 {
-    Acition_Result *result = route->handler(request);
+    action_result->body = route->handler(request);
+    
+    if (action_result->body == NULL)
+    {
+        action_result->status_code = (-1);
+    }
     // TODO : implemnt checks for the return value
     return result;
 }
 
 HTTP_Response *handleRequest(const HTTP_Request *request)
 {
-    int STATUS_CODE;
+    HTTP_Response response;
 
-    
-    HTTP_Response *response = malloc(sizeof(HTTP_Response));
-    if(response == NULL)
-    {
-        perror("malloc: failed to allocate memory for response struct");
-        exit(EXIT_FAILURE);
-    }
-    memset(response, 0, sizeof(*response));
-
-    // we need to pass the request, to the correct route, and to the correct function. 
-    //typedef struct {
-    // char *method;
-    // char *path;
-    // HTTP_Response* (*handler)(const HTTP_Request * request)
-        // } Route;
     Route *route = malloc(sizeof(Route));
-    if (route == NULL)
-    {
-        perror("failed to allocate memory for route");
-        exit(EXIT_FAILURE);
-    }
+    malloc_check(route);
+
     // filling in the route structure
     safe_strncpy(route->method, request->method, sizeof(route->method));
     safe_strncpy(route->path, request->path, sizeof(route->path));
+
+    // TODO : agree upon the status codes from each function
+    int resolve_status = route_resolver(route);
+    if (resolve_status != 0)
+    {
+        perror("route_resolver : failed to resolve the route");
+        exit(EXIT_FAILURE);
+    }
+
+    Action_Result *action_result = malloc(sizeof(Action_Result));
+    malloc_check(action_result);
+
+
 
     // need to call the handle route function here
     // it will accept the route half-constructed structure, assign the corresponding handler function to it, 
     // and call the handlre function with 
 
-    safe_strncpy(response->version, request->version, sizeof(response->version));
-    safe_strncpy(response->headers.content_type, request->headers.content_type, sizeof(response->headers.content_type));
+    safe_strncpy(response.version, request->version, sizeof(response.version));
+    safe_strncpy(response.headers.content_type, request->headers.content_type, sizeof(response.headers.content_type));
 
 
 }

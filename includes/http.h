@@ -3,6 +3,8 @@
 
 #include <stddef.h>
 
+#include "../includes/buffer.h"
+
 // basic status codes
 #define SUCCESS 200
 #define NOT_FOUND 404
@@ -140,5 +142,27 @@ Action_Result *route_handler(const Route *route, const HTTP_Request *request);
  * mutable at runtime.
  */
 HTTP_Response *handle_request(const HTTP_Request *request);
+
+/*
+ * serialize_response - formats an HTTP_Response into wire-format bytes
+ * (status line, headers, blank-line separator, body) ready to be sent
+ * over a connection.
+ *
+ * response: read-only, not modified. response->headers.content_lenght
+ *           must already reflect the true length of response->body --
+ *           this function writes that value into the Content-Length
+ *           header as-is; it does not compute or verify it.
+ *
+ * Returns a heap-allocated Buffer* (see buffer.h) containing the
+ * complete serialized response. Caller takes ownership and must call
+ * free_buffer() on it. Returns NULL on allocation failure (from
+ * new_buffer, or an internal buffer_append/expand_buffer failure) --
+ * no partial buffer is leaked back to the caller in that case.
+ *
+ * Thread-safety: safe to call concurrently, as long as each call is
+ * given its own HTTP_Response and produces its own Buffer.
+ */
+Buffer *serialize_response(HTTP_Response *response);
+
 
 #endif // REQUEST_H

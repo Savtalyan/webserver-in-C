@@ -4,6 +4,7 @@
 
 #include "../includes/http.h"
 #include "../includes/utils.h"
+#include "../includes/buffer.h"
 
 // TODO: implement the logic of filling this table based on the routes file
 static const Route routing_table[] = {
@@ -12,6 +13,8 @@ static const Route routing_table[] = {
 };
 
 #define ROUTES_LENGHT (sizeof(routing_table) / sizeof(routing_table[0]))
+#define CRLF "\r\n"
+#define MAXBODYLEN 4096
 
 
 Action_Result *server_root(const HTTP_Request *request)
@@ -238,4 +241,70 @@ HTTP_Response *handle_request(const HTTP_Request *request)
         free(result);
     }
     return response;
+}
+
+
+Buffer *serialize_response(HTTP_Response *response)
+{
+    char temp_buff[MAXBODYLEN]; // 4096
+    int bytes_written;
+
+    Buffer *buffer = new_buffer(BASE_SIZE);
+    if (buffer == NULL)
+    {
+        return NULL;
+    }
+
+    // first line of the response
+    bytes_written = snprintf(temp_buff, sizeof(temp_buff), "%s %d %s%s", response->version, 
+                                response->statusCode, response->reason, CRLF);
+
+    if(buffer_append(buffer, temp_buff, bytes_written) != 0)
+    {
+        fprintf(stderr, "failed to append request line");
+        free_buffer(buffer);
+        return NULL;
+    }
+
+    // headers - content type
+    bytes_written = snprintf(temp_buff, sizeof(temp_buff), "Content-Type : %s%s", response->headers.content_type, CRLF);
+
+    if(buffer_append(buffer, temp_buff, bytes_written) != 0)
+    {
+        fprintf(stderr, "failed to append content type");
+        free_buffer(buffer);
+        return NULL;
+    }
+    
+    // headers - content lenght
+    bytes_written = snprintf(temp_buff, sizeof(temp_buff), "Content-Length : %zu%s", response->headers.content_lenght, CRLF);
+
+    if(buffer_append(buffer, temp_buff, bytes_written) != 0)
+    {
+        fprintf(stderr, "failed to append content lenght");
+        free_buffer(buffer);
+        return NULL;
+    }
+
+    // TODO: add other metadata
+
+    // empty line
+    if(buffer_append(buffer, CRLF, strlen(CRLF)) != 0)
+    {
+        fprintf(stderr, "failed to append the empty line");
+        free_buffer(buffer);
+        return NULL;
+    }
+
+    // body
+    size_t body_len = strlen(response->body);
+
+    if(buffer_append(buffer, response->body, body_len) != 0)
+    {
+        fprintf(stderr, "failed to append response body");
+        free_buffer(buffer);
+        return NULL;
+    }
+
+    return buffer;
 }

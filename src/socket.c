@@ -1,89 +1,77 @@
-#include <sys/socket.h>
-#include <sys/types.h>
 #include <netinet/in.h>
-#include <arpa/inet.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
 
 
-// create a socket and return the socket fd
-// bind the socket to the given address
-// listen to requests
-
+int create_listening_socket(const char *port, const int backlog)
+{
 	int socket_fd;
-	int client_fd;
-	
-	struct sockaddr_in server_addr;
-	struct sockaddr_in client_addr;
-	socklen_t client_len = sizeof(client_addr);
+	int res;
+
+	struct addrinfo hints;
+	struct addrinfo *results;
+	struct addrinfo *rp;
+
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_protocol = 0;
+
+	res = getaddrinfo(NULL, port, &hints, &results);
+	if (res != 0)
+	{
+		fprintf(stderr, "Error: %s\n", gai_strerror(res));
+		return -1;
+	}
+
+	for(rp=results; rp != NULL; rp = rp->ai_next)
+	{
+		socket_fd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
 		
-	char read_buffer[2048];
-    char write_buffer[2048];
-
-	// creating an IPV4 socket, TCP
-	socket_fd = socket(AF_INET, SOCK_STREAM, 0);
-	if (socket_fd == -1)
-	{
-		perror("socket : error while creating socket");
-		exit(EXIT_FAILURE);
-	}
-
-    int opt = 1;
-    setsockopt(socket_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
-	
-	// sockaddr_in contains padding (sin_zero). 
-    // If it contains junk data, some systems may reject the bind().
-    // So we zero the entire structure first.
-	memset(&server_addr, 0, sizeof(server_addr));
-
-	server_addr.sin_family = AF_INET;
-	server_addr.sin_addr.s_addr = INADDR_ANY;
-	server_addr.sin_port = htons(PORT);
-	
-	// Most socket functions expect a generic struct sockaddr*.
-    // Since we have a sockaddr_in, we cast its address to (struct sockaddr*).
-	
-	int bind_result = bind(socket_fd, (struct sockaddr*)&server_addr, sizeof(server_addr));
-	if (bind_result < 0)
-	{
-		perror("bind: error while binding the server");
-		exit(EXIT_FAILURE);
-	}
-	
-	int listen_result = listen(socket_fd, BACKLOG);
-	if (listen_result < 0)
-	{
-		perror("listen: error while entering listening mode");
-		exit(EXIT_FAILURE);
-	}
-	
-    printf("Server launched on port %d\n", PORT);
-
-	while (1)
-	{
-		client_fd = accept(socket_fd, (struct sockaddr*)&client_addr, &client_len);
-		if (client_fd == SOCKERROR)
+		if (socket_fd == -1)
 		{
-			perror("accept : failed to accept client connection");
 			continue;
 		}
 
-        
-		int read_result = read(client_fd, read_buffer, sizeof(read_buffer) - 1);
-		if(read_result <= 0)
-        {
-            if(read_result == SOCKERROR)
-            {
-                perror("read: failed to read");
-            }
-            close(client_fd);
-            continue;
-        }
-        read_buffer[read_result] = '\0';
-
-        printf("Request: \n %s \n", read_buffer);
-
-        close(client_fd);
+		if (bind(socket_fd, rp->ai_addr, rp->ai_addrlen) == 0)
+		{
+			break;
+		}
+		close(socket_fd);
+	}
+	if (rp == NULL)
+	{
+		fprintf(stderr, "Failed to bind\n");
+		freeaddrinfo(results);
+		return -1;
 	}
 
-	close(socket_fd);
-	return 0;
+	freeaddrinfo(results);
+
+	if (listen(socket_fd, backlog) == -1)
+	{
+		fprintf(stderr, "Failed to put the socket into listening mode\n");
+		close(socket_fd);
+		return -1;
+	}
+	return socket_fd;	
 }
+
+int accept_connection(const int listen_fd)
+{
+	// TODO: add peer address retrieval
+	int conn_fd = accept(listen_fd, NULL, NULL);
+	if (conn_fd == -1)
+	{
+		fprintf(stderr, "failed to accept a connection,%s\n", strerror(errno));
+		return -1;
+	}
+	return conn_fd;
+}
+

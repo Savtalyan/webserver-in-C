@@ -221,7 +221,7 @@ HTTP_Response *handle_request(const HTTP_Request *request)
     safe_strncpy(response->headers.content_type, request->headers.content_type,
                 sizeof(response->headers.content_type));
 
-    if (matched = NULL)
+    if (matched == NULL)
     {
         response->statusCode = NOT_FOUND;
         safe_strncpy(response->reason, "Not Found", sizeof(response->reason));

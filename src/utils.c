@@ -1,21 +1,30 @@
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
-static void safe_strncpy(char *dest, const char *src, size_t dest_size)
+#include "../includes/utils.h"
+
+void safe_strncpy(char *dest, const char *src, size_t dest_size)
 {
-    strncpy(dest, src, dest_size - 1);
-    dest[dest_size - 1] = '\0';
+    if (dest_size == 0)
+    {
+        return;
+    }
+    size_t n = strnlen(src, dest_size - 1);
+    memcpy(dest, src, n);
+    dest[n] = '\0';
 }
 
-static void malloc_check(void *ptr)
+void malloc_check(void *ptr)
 {
     if (ptr == NULL)
     {
-        perror("malloc : failed to allocate memory");
+        perror("malloc: failed to allocate memory");
         exit(EXIT_FAILURE);
     }
 }
 
-static char *find_crlf(const char *buffer, size_t buff_len, size_t start_offset)
+const char *find_crlf(const char *buffer, size_t buff_len, size_t start_offset)
 {
     if (start_offset >= buff_len)
     {
@@ -23,9 +32,9 @@ static char *find_crlf(const char *buffer, size_t buff_len, size_t start_offset)
     }
     for (size_t i = start_offset; i + 1 < buff_len; i++)
     {
-        if (buffer[i] == '\r' && buffer[i+1] == '\n')
+        if (buffer[i] == '\r' && buffer[i + 1] == '\n')
         {
-            return (char*)&buffer[i];
+            return &buffer[i];
         }
     }
     return NULL;

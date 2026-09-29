@@ -33,15 +33,13 @@ Buffer *new_buffer(size_t base_size)
 
 int expand_buffer(Buffer *buffer, size_t needed_size)
 {
-    buffer->temp = realloc(buffer->buff, (buffer->size + needed_size));
-    if(buffer->temp == NULL)
+    char *temp = realloc(buffer->buff, (buffer->size + needed_size));
+    if(temp == NULL)
     {
         fprintf(stderr, "realloc : %s\n", strerror(errno));
         return -1;
     }
-    buffer->buff = buffer->temp;
-    buffer->temp = NULL;
-
+    buffer->buff = temp;;
     buffer->capacity = buffer->capacity + needed_size;
     buffer->size = buffer->size + needed_size;
 
@@ -50,22 +48,37 @@ int expand_buffer(Buffer *buffer, size_t needed_size)
 
 int buffer_append(Buffer *buffer, const char *data, size_t len)
 {
-    while(buffer->capacity < len)
+    if (len == 0)
     {
-        int exp = expand_buffer(buffer, len);
-        if(exp != 0)
+        return 0;
+    }
+
+    if (buffer->capacity < len)
+    {
+        size_t grow = len > buffer->size ? len : buffer->size;
+        if (expand_buffer(buffer, grow) != 0)
         {
             return -1;
         }
     }
+
     memcpy(buffer->buff + (buffer->size - buffer->capacity), data, len);
     buffer->capacity = buffer->capacity - len;
     return 0;
 }
 
+size_t buffer_used(const Buffer *buffer)
+{
+    return buffer->size - buffer->capacity;
+}
 
 void free_buffer(Buffer *buffer)
 {
+    if(buffer == NULL)
+    {
+        return;
+    }
+
     free(buffer->buff);
     free(buffer);
 }

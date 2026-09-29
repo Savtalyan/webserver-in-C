@@ -1,12 +1,14 @@
-#ifndef REQUEST_H
-#define REQUEST_H
+#ifndef HTTP_H
+#define HTTP_H
 
 #include <stddef.h>
+#include <sys/types.h>
 
 #include "../includes/buffer.h"
 
 // basic status codes
 #define SUCCESS 200
+#define BAD_REQUEST 400
 #define NOT_FOUND 404
 #define SERVER_ERR 500
 
@@ -52,117 +54,41 @@ typedef struct {
     Action_Result *(*handler)(const HTTP_Request *request);
 } Route;
 
-/*
- * server_root - handler for GET /.
- *
- * request: read-only, not modified. Currently unused by this handler.
- *
- * Returns a heap-allocated Action_Result. Caller takes ownership and
- * must free() both the returned struct and its body field.
- */
+/* server_root - handler for GET /.
+ * Returns heap-allocated Action_Result; caller frees struct and body. */
 Action_Result *server_root(const HTTP_Request *request);
 
-/*
- * handle_get_users - handler for GET /users.
- *
- * request: read-only, not modified.
- *
- * Currently a placeholder: returns NULL (not yet implemented).
- * route_handler() is responsible for turning a NULL result into a
- * proper SERVER_ERR response before it reaches the client.
- */
+/* handle_get_users - handler for GET /users. Placeholder: returns NULL;
+ * route_handler() turns that into a SERVER_ERR response. */
 Action_Result *handle_get_users(const HTTP_Request *request);
 
-/*
- * parse_request - parses a raw HTTP request from a byte buffer into a
- * structured HTTP_Request.
- *
- * buffer:   raw bytes read from the client socket. Does NOT need to be
- *           null-terminated -- buff_len is authoritative.
- * buff_len: number of valid bytes in buffer.
- * request:  caller-owned HTTP_Request to populate. Must not be NULL.
- *           On failure, contents are unreliable -- do not use them.
- *
- * Returns 0 on success, -1 if the request is malformed or incomplete.
- * Does not take ownership of buffer or request; caller retains both.
- *
- * Thread-safety: safe to call concurrently as long as each call gets
- * its own buffer and its own HTTP_Request.
- */
+/* read_request - one read() from client_fd into buffer.
+ * Returns read()'s result (bytes read, 0 on EOF, -1 on error). */
+ssize_t read_request(int client_fd, char *buffer, size_t buff_len);
+
+/* parse_request - parses raw bytes into *request. buffer need not be
+ * NUL-terminated. *request is fully zeroed first, so it is always in a
+ * defined state. Returns 0 on success, -1 if malformed/incomplete. */
 int parse_request(const char *buffer, size_t buff_len, HTTP_Request *request);
 
-/*
- * build_route - fills in a Route's method/path from a parsed request,
- * as a lookup key for route_resolver. Does not set handler (left NULL).
- *
- * request: read-only, not modified.
- * route:   caller-owned Route to fill in. Must not be NULL.
- */
+/* build_route - fills route's method/path from request; handler = NULL. */
 void build_route(const HTTP_Request *request, Route *route);
 
-/*
- * route_resolver - looks up the routing table for an entry matching
- * route's method and path.
- *
- * route: read-only key to match against (method + path); its handler
- *        field is ignored.
- *
- * Returns a pointer into the static routing table (not caller-owned,
- * do not free) on match, or NULL if no route matches.
- */
-Route *route_resolver(Route *route);
+/* route_resolver - returns a pointer into the static routing table
+ * (do not free / modify) or NULL if no route matches. */
+const Route *route_resolver(const Route *route);
 
-/*
- * route_handler - invokes the matched route's handler and guarantees
- * a non-NULL result.
- *
- * route:   a resolved route (as returned by route_resolver), not NULL.
- * request: read-only, passed through to the handler.
- *
- * Returns a heap-allocated Action_Result. Caller takes ownership and
- * must free() both the struct and its body. If the handler itself
- * returns NULL, this constructs a SERVER_ERR result instead of
- * propagating NULL.
- */
+/* route_handler - invokes the handler, guaranteeing a non-NULL result.
+ * Caller frees the struct and its body. */
 Action_Result *route_handler(const Route *route, const HTTP_Request *request);
 
-/*
- * handle_request - resolves a route for the given request and produces
- * a response, dispatching to the matching handler internally.
- *
- * request: caller-owned, read-only, not modified.
- *
- * Returns a heap-allocated HTTP_Response*. Caller takes ownership and
- * must free() it. Never returns NULL -- an unmatched route or a failing
- * handler is represented as a 404/500 response, not a NULL pointer.
- *
- * Thread-safety: safe to call concurrently. The only state shared
- * across calls is the routing table, which is read-only after startup
- * (static const) -- revisit this guarantee if routes ever become
- * mutable at runtime.
- */
+/* handle_request - produces a heap-allocated HTTP_Response (caller frees).
+ * Never returns NULL. Content-Length is filled in from the final body. */
 HTTP_Response *handle_request(const HTTP_Request *request);
 
-/*
- * serialize_response - formats an HTTP_Response into wire-format bytes
- * (status line, headers, blank-line separator, body) ready to be sent
- * over a connection.
- *
- * response: read-only, not modified. response->headers.content_lenght
- *           must already reflect the true length of response->body --
- *           this function writes that value into the Content-Length
- *           header as-is; it does not compute or verify it.
- *
- * Returns a heap-allocated Buffer* (see buffer.h) containing the
- * complete serialized response. Caller takes ownership and must call
- * free_buffer() on it. Returns NULL on allocation failure (from
- * new_buffer, or an internal buffer_append/expand_buffer failure) --
- * no partial buffer is leaked back to the caller in that case.
- *
- * Thread-safety: safe to call concurrently, as long as each call is
- * given its own HTTP_Response and produces its own Buffer.
- */
+/* serialize_response - formats response into wire bytes. Caller must call
+ * free_buffer() on the result. Use buffer_used() for the length to send.
+ * Returns NULL on allocation failure. */
 Buffer *serialize_response(HTTP_Response *response);
 
-
-#endif // REQUEST_H
+#endif // HTTP_H

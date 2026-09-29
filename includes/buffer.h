@@ -1,37 +1,30 @@
 #ifndef BUFFER_H
 #define BUFFER_H
 
-#define BASE_SIZE 32
-
 #include <stddef.h>
 
+#define BASE_SIZE 32
 
-typedef struct {
-    char *buff;       // pointer to the allocated memory
-    char *temp;
-    size_t  size;         // total allocated size (whole buffer)
-    size_t  capacity;      // remaining free space (shrinks with each write)
+typedef struct Buffer {
+    char   *buff;      // pointer to the allocated memory
+    size_t  size;      // total allocated size (whole buffer)
+    size_t  capacity;  // remaining free space (shrinks with each write)
 } Buffer;
 
-struct buffer *new_buffer(size_t base_size);
-    // allocates buff of base_size, size = capacity = base_size
-    // returns NULL on allocation failure
+// allocates buff of base_size, size = capacity = base_size; NULL on failure
+Buffer *new_buffer(size_t base_size);
 
-int expand_buffer(struct buffer *buffer, size_t needed_size);
-    // grows buff via realloc (into a LOCAL temp pointer, checked for
-    // NULL before committing), updates size and capacity in place
-    // returns a status code: success / failure
+// grows buff by needed_size via realloc into a LOCAL pointer, committed
+// only if realloc succeeded. Returns 0 on success, -1 on failure.
+int expand_buffer(Buffer *buffer, size_t needed_size);
 
-int buffer_append(struct buffer *buffer, const char *data, size_t len);
-    // checks buffer->capacity against len; calls expand_buffer if
-    // len > capacity; then copies data into the free region at
-    // (buffer->buff + used-so-far) and shrinks capacity by len
-    // returns a status code: success / failure (propagates
-    // expand_buffer's failure if growth was needed and failed)
+// appends len bytes; grows the buffer if needed. 0 on success, -1 on failure.
+int buffer_append(Buffer *buffer, const char *data, size_t len);
 
-void free_buffer(struct buffer *buffer);
-    // releases buff and the struct itself -- you'll need this once
-    // serialize_response's caller is done sending the response,
-    // or you've got a new leak the moment this module exists
+// number of bytes written so far (what you pass to send())
+size_t buffer_used(const Buffer *buffer);
+
+// releases buff and the struct itself. Safe on NULL.
+void free_buffer(Buffer *buffer);
 
 #endif // BUFFER_H

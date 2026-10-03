@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <errno.h>
+#include <sys/types.h>
 
 #include "../includes/http.h"
 #include "../includes/utils.h"
@@ -309,10 +311,30 @@ Buffer *serialize_response(HTTP_Response *response)
         buffer_append(buffer, CRLF, strlen(CRLF)) != 0 ||
         buffer_append(buffer, response->body, strlen(response->body)) != 0)
     {
-        fprintf(stderr, "failed to serialize response\n");
+        fprintf(stderr, "failed to serialize response\n")
         free_buffer(buffer);
         return NULL;
     }
 
     return buffer;
+}
+
+ssize_t send_response(const int client_fd, const char *buffer, size_t buff_len)
+{
+    ssize_t sent_so_far = 0;
+
+    while(sent_so_far < buff_len)
+    {
+        ssize_t sent = write(client_fd, buffer + sent_so_far, buff_len - sent_so_far);
+        if(sent == -1)
+        {
+            if (errno == EINTR)
+            {
+                continue;
+            }
+            return -1;
+        }
+        sent_so_far += (size_t)sent;
+    }
+    return (ssize_t)sent_so_far;
 }

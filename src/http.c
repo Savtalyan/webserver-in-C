@@ -311,7 +311,7 @@ Buffer *serialize_response(HTTP_Response *response)
         buffer_append(buffer, CRLF, strlen(CRLF)) != 0 ||
         buffer_append(buffer, response->body, strlen(response->body)) != 0)
     {
-        fprintf(stderr, "failed to serialize response\n")
+        fprintf(stderr, "failed to serialize response\n");
         free_buffer(buffer);
         return NULL;
     }

@@ -2,37 +2,41 @@
 #define THREAD_H
 
 #include <sys/types.h>
+#include <stdbool.h>
+
+#include "ring_buffer.h"
 
 #define THREADS_COUNT 4
-
+#define BUFFER_FULL "Buffer is full\n"
+#define BAD_CLIENT_FD "Bad client fd\n"
 
 typedef struct {
     pthread_mutex_t     lock;
-    pthread_cond_t      not_empty;
-    pthread_cond_t      not_full;
+    pthread_cond_t      cond;
     bool                stopping;
-
-    size_t              threads_count;
-    Queue               *queue;  // will import the queue from another module
+    size_t              thread_count;
+    Ring_Buffer         *buffer;
     pthread_t           threads[];
 
 } Thread_Pool;
 
-// allocates the pool, initializes the mutex, conditions and queue
-// Starts the threads 
-Thread_Pool *pool_create(size_t n_threads, size_t queue_capacity);
+// creates the pool, initialized the ring buffer, mutex, cond
+// Returns : Thread_Pool
+Thread_Pool *pool_init(Thread_Pool *pool, Ring_Buffer *rb, size_t thread_count, size_t queue_capacity);
 
-// Locks, pushes the fd, signals not_empty, unlocks
+// accepts a connection, locks the mutex, pushes the connection
+// fd to the buffer, sends pthread_cond_signal, releases mutex
 int pool_submit(Thread_Pool *pool, int client_fd);
 
 // sets stopping, joins threads, closes fds, frees resources
-void pool_destoroy(Thread_Pool *pool);
+void pool_destroy(Thread_Pool *pool);
 
 
+// thread inside wrapper
+// runs infinite loop, puts the thread to sleep
+// until the condition predicate is met, wakes up 
+// runs the function
+void *worker(void *arg);
 
-static void *worker_main(void *arg);
-
-static int queue_push(void *args);
-static int queue_pop(void *args);
 
 #endif // THREAD_H

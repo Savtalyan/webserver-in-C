@@ -4,67 +4,69 @@
 
 #include "../includes/ring_buffer.h"
 
-void buffer_init(Ring_Buffer *rb)
+void buffer_init(Ring_Buffer *rb, size_t buff_capacity)
 {
-    rb->head = 0;
-    rb->tail = 0;
-    rb->count = 0;
+    rb->buffer[buff_capacity];
+    rb->buffer_capacity = buff_capacity;
+    rb->head            = 0;
+    rb->tail            = 0;
+    rb->count           = 0;
 }
 
 bool buffer_push(Ring_Buffer *rb, int data)
 {
-    if(rb->count == BUFFER_SIZE)
+    if(rb->count == rb->buffer_capacity)
     {
         return false;
     }
-    buffer->buffer[buffer->head] = data;
-    buffer->head = (buffer->head + 1) % BUFFER_SIZE;
-    buffer->count++;
+    rb->buffer[rb->head] = data;
+    rb->head = (rb->head + 1) % rb->buffer_capacity;
+    rb->count++;
     return true;
 }
 
 void buffer_push_overwrite(Ring_Buffer *rb, int data)
 {
-    buffer->buffer[buffer->head] = data;
-    buffer->head = (buffer->head + 1) % BUFFER_SIZE;
-    if (buffer->size == BUFFER_SIZE)
+    rb->buffer[rb->head] = data;
+    rb->head = (rb->head + 1) % rb->buffer_capacity;
+    if (rb->count == rb->buffer_capacity)
     {
-        buffer->tail = (buffer->tail + 1) % BUFFER_SIZE;
+        rb->tail = (rb->tail + 1) % rb->buffer_capacity;
     }
     else
     {
-        buffer->count++;
+        rb->count++;
     }
 }
 
 bool buffer_pop(Ring_Buffer *rb, int *data)
 {
-    if(buffer->count == 0)
+    if(rb->count == 0)
     {
         return false;
     }
-    *data = buffer->buffer[buffer->tail];
-    buffer->tail = (buffer->tail + 1) % BUFFER_SIZE;
-    buffer->count--;
+    *data = rb->buffer[rb->tail];
+    rb->tail = (rb->tail + 1) % rb->buffer_capacity;
+    rb->count--;
     return true;
 }
 
 bool buffer_peek(Ring_Buffer *rb, int *data)
 {
-    if(buffer->count == 0)
+    if(rb->count == 0)
     {
         return false;
     }
-    *data = buffer->buffer[buffer->tail];
+    *data = rb->buffer[rb->tail];
     return true;
 }
 
 bool buffer_is_full(Ring_Buffer *rb)
 {
-    return buffer->count == BUFFER_SIZE;
+    return rb->count == rb->buffer_capacity;
 }
 
 bool buffer_is_empty(Ring_Buffer *rb)
 {
-    return buffer->count == 0;
+    return rb->count == 0;
 }

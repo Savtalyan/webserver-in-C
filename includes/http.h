@@ -94,6 +94,6 @@ Buffer *serialize_response(HTTP_Response *response);
 /* send_response - checks the lenght of the response, and runs a loop
  * to make sure all the byter were sent. 
  * Returns -1 on failure, otherwise the number of bytes written */
-ssize_t send_response(const int client_fd, const char *buffer, ssize_t buff_len);
+ssize_t send_response(const int client_fd, const char *buffer, size_t buff_len);
 
 #endif // HTTP_H

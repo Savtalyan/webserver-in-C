@@ -1,37 +1,46 @@
-CC      := gcc
-CFLAGS  := -std=gnu11 -Wall -Wextra -Wpedantic -O2
-LDFLAGS :=
+# ---- Project ----
+TARGET   := server
 
-SRC_DIR   := src
-BUILD_DIR := build
-TARGET    := server
+SRCDIR   := src
+INCDIR   := includes
+BUILDDIR := build
 
-SRCS := $(wildcard $(SRC_DIR)/*.c)
-OBJS := $(SRCS:$(SRC_DIR)/%.c=$(BUILD_DIR)/%.o)
-DEPS := $(OBJS:.o=.d)
+SRCS     := $(addprefix $(SRCDIR)/, main.c buffer.c http.c ring_buffer.c socket.c thread.c utils.c)
+OBJS     := $(SRCS:$(SRCDIR)/%.c=$(BUILDDIR)/%.o)
+DEPS     := $(OBJS:.o=.d)
 
-.PHONY: all debug run clean
+# ---- Toolchain / flags ----
+CC       ?= cc
+CFLAGS   ?= -std=c11 -Wall -Wextra -Wpedantic -O2
+CPPFLAGS += -I$(INCDIR) -D_POSIX_C_SOURCE=200809L -MMD -MP
+LDFLAGS  ?=
+LDLIBS   += -pthread
+
+# `make DEBUG=1` for a debug build with sanitizers
+ifeq ($(DEBUG),1)
+CFLAGS  := -std=c11 -Wall -Wextra -Wpedantic -O0 -g3 -fsanitize=address,undefined
+LDFLAGS += -fsanitize=address,undefined
+endif
+
+# ---- Rules ----
+.PHONY: all clean run
 
 all: $(TARGET)
 
 $(TARGET): $(OBJS)
-	$(CC) $(CFLAGS) $(OBJS) -o $@ $(LDFLAGS)
+	$(CC) $(LDFLAGS) $^ $(LDLIBS) -o $@
 
-# -MMD -MP: generate .d files so editing a header rebuilds the .c files that include it
-$(BUILD_DIR)/%.o: $(SRC_DIR)/%.c | $(BUILD_DIR)
-	$(CC) $(CFLAGS) -MMD -MP -c $< -o $@
+$(BUILDDIR)/%.o: $(SRCDIR)/%.c | $(BUILDDIR)
+	$(CC) $(CPPFLAGS) $(CFLAGS) -pthread -c $< -o $@
 
-$(BUILD_DIR):
+$(BUILDDIR):
 	mkdir -p $@
-
-# clean rebuild with debug info + AddressSanitizer/UBSan
-debug: clean
-	$(MAKE) CFLAGS="-std=gnu11 -Wall -Wextra -Wpedantic -g -O0 -fsanitize=address,undefined" LDFLAGS="-fsanitize=address,undefined" all
 
 run: $(TARGET)
 	./$(TARGET)
 
 clean:
-	rm -rf $(BUILD_DIR) $(TARGET)
+	rm -rf $(BUILDDIR) $(TARGET)
 
+# Auto-generated header dependencies (rebuilds a .o when any .h it includes changes)
 -include $(DEPS)

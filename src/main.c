@@ -14,18 +14,17 @@
 
 #define PORT "8080"
 #define BACKLOG 10
-#define READ_BUFFER_SIZE 4096
 
 #define THREAD_COUNT 4
-#define POOL_CAPACITY 4
+#define POOL_CAPACITY 10
 
 
 int main(void)
 {
-    Thread_Pool *t_pool;
-    Ring_Buffer *rb;
+    Thread_Pool t_pool;
+    Ring_Buffer rb;    
 
-    pool_init(t_pool, rb, THREAD_COUNT, POOL_CAPACITY);
+    pool_init(&t_pool, &rb, THREAD_COUNT, POOL_CAPACITY);
 
     signal(SIGPIPE, SIG_IGN);
 
@@ -42,13 +41,13 @@ int main(void)
         int connection_fd = accept_connection(listen_fd);
         if(connection_fd > -1)
         {
-            pool_submit(t_pool, connection_fd);
+            pool_submit(&t_pool, connection_fd);
         }
         else
         {
             continue;
         }
     }   
-    pool_destroy(t_pool); 
+    pool_destroy(&t_pool); 
     return 0;
 }

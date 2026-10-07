@@ -7,4 +7,8 @@ int create_listening_socket(const char *port, const int backlog);
 // returns a connected fd, or -1 on failure
 int accept_connection(const int listen_fd);
 
+void handle_client(int client_fd);
+
+
+
 #endif

@@ -321,7 +321,7 @@ Buffer *serialize_response(HTTP_Response *response)
 
 ssize_t send_response(const int client_fd, const char *buffer, size_t buff_len)
 {
-    ssize_t sent_so_far = 0;
+    size_t sent_so_far = 0;
 
     while(sent_so_far < buff_len)
     {

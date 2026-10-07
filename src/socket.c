@@ -9,6 +9,8 @@
 #include <errno.h>
 
 #include "../includes/socket.h"
+#include "../includes/http.h"
+#include "../includes/buffer.h"
 
 int create_listening_socket(const char *port, const int backlog)
 {
@@ -88,4 +90,43 @@ int accept_connection(const int listen_fd)
 		return -1;
 	}
 	return conn_fd;
+}
+
+void handle_client(int client_fd)
+{
+    char read_buffer[READ_BUFFER_SIZE];
+
+    ssize_t n = read_request(client_fd, read_buffer, sizeof(read_buffer));
+    if (n <= 0)
+    {
+        if (n < 0)
+        {
+            perror("read: failed to read");
+        }
+        return;
+    }
+
+    HTTP_Request request;
+    if (parse_request(read_buffer, (size_t)n, &request) != 0)
+    {
+        static const char bad[] =
+            "HTTP/1.1 400 Bad Request\r\n"
+            "Content-Type: text/plain\r\n"
+            "Content-Length: 12\r\n"
+            "Connection: close\r\n"
+            "\r\n"
+            "Bad Request\n";
+        send_response(client_fd, bad, sizeof(bad) - 1);
+        return;
+    }
+
+	HTTP_Response *response = handle_request(&request);
+
+	Buffer *out = serialize_response(response);
+	if (out != NULL)
+	{
+		send_response(client_fd, out->buff, buffer_used(out));
+		free_buffer(out);
+	}
+	free(response);
 }

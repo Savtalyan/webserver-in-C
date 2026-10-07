@@ -17,28 +17,35 @@ Thread_Pool *pool_init(Thread_Pool *pool, Ring_Buffer *rb, size_t thread_count, 
 
     pool->stopping       = false;
     pool->thread_count   = thread_count;
-    pool->buffer = rb;
-    return pool;
+    pool->buffer         = rb;
 
+    for(size_t i=0; i< thread_count; i++)
+    {
+        pthread_create(&pool->threads[i], NULL, worker, pool);
+    }
+
+    return pool;
 }
 
 int pool_submit(Thread_Pool *pool, int client_fd)
 {
     if (client_fd < 0)
     {
-        perror(BAD_CLIENT_FD);
+        fprintf(stderr, "%s\n", BAD_CLIENT_FD);
         return -1;
     }
     pthread_mutex_lock(&pool->lock);
     if (!buffer_is_full(pool->buffer))
     {
-        pool_submit(pool, client_fd);
+        buffer_push(pool->buffer, client_fd);
         pthread_cond_signal(&pool->cond);
         pthread_mutex_unlock(&pool->lock);
         return 0;
     }
-    perror(BUFFER_FULL);
-    return 1; 
+    pthread_mutex_unlock(&pool->lock);
+    fprintf(stderr, "%s\n", BUFFER_FULL);
+    close(client_fd);
+    return 1;  
 }
 
 // sets stopping, joins threads, closes fds, frees resources
@@ -46,17 +53,25 @@ void pool_destroy(Thread_Pool *pool)
 {
     if(pool)
     {
+        pthread_mutex_lock(&pool->lock);
         pool->stopping = true;
+        pthread_cond_broadcast(&pool->cond);
+        pthread_mutex_unlock(&pool->lock);
+
         for(int i=0; i < (int)pool->thread_count; i++)
         {
             pthread_join(pool->threads[i], NULL);
         }
-        int fd;
+
         while(!buffer_is_empty(pool->buffer))
         {
-            int fd = buffer_pop(pool->buffer, &fd);
+            int fd;
+            buffer_pop(pool->buffer, &fd);
             close(fd);   
         }
+        buffer_free(pool->buffer);
+        pthread_mutex_destroy(&pool->lock);
+        pthread_cond_destroy(&pool->cond);
     }
 }
 
@@ -69,41 +84,20 @@ void *worker(void *arg)
     while(1)
     {
         pthread_mutex_lock(&pool->lock);
-        while(buffer_is_empty(pool->buffer))
+        while(buffer_is_empty(pool->buffer) && !pool->stopping)
         {
             pthread_cond_wait(&pool->cond, &pool->lock);
         }
+        if (pool->stopping)
+        {
+            pthread_mutex_unlock(&pool->lock);
+            break;
+        }
         buffer_pop(pool->buffer, &connection_fd);
+        pthread_mutex_unlock(&pool->lock);
+        
         handle_client(connection_fd);
+        close(connection_fd);
     }
     return NULL;
 }
-
-
-void handle_client(int client_fd)
-{
-    char read_buffer[READ_BUFFER_SIZE];
-
-    ssize_t n = read_request(client_fd, read_buffer, sizeof(read_buffer));
-    if (n <= 0)
-    {
-        if (n < 0)
-        {
-            perror("read: failed to read");
-        }
-        return;
-    }
-
-    HTTP_Request request;
-    if (parse_request(read_buffer, (size_t)n, &request) != 0)
-    {
-        static const char bad[] =
-            "HTTP/1.1 400 Bad Request\r\n"
-            "Content-Type: text/plain\r\n"
-            "Content-Length: 12\r\n"
-            "Connection: close\r\n"
-            "\r\n"
-            "Bad Request\n";
-        send_all(client_fd, bad, sizeof(bad) - 1);
-        return;
-    }

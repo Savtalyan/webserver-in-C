@@ -10,7 +10,7 @@ typedef struct {
     int tail;
     int count;
     int buffer_capacity;
-    int buffer[];
+    int *buffer;
 } Ring_Buffer;
 
 void buffer_init(Ring_Buffer *rb, size_t buff_capacity);
@@ -20,6 +20,7 @@ bool buffer_pop(Ring_Buffer *rb, int *data);
 bool peek(Ring_Buffer *rb, int *data);
 bool buffer_is_empty(Ring_Buffer *rb);
 bool buffer_is_full(Ring_Buffer *rb);
+void buffer_free(Ring_Buffer *rb);
 
 
 #endif // RING_BUFFER_H

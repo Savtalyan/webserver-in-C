@@ -1,12 +1,15 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <sys/types.h>
+#include <stdlib.h>
 
 #include "../includes/ring_buffer.h"
+#include "../includes/utils.h"
 
 void buffer_init(Ring_Buffer *rb, size_t buff_capacity)
 {
-    rb->buffer[buff_capacity];
+    rb->buffer          = malloc(sizeof(int) * buff_capacity);
+    malloc_check(rb->buffer);
     rb->buffer_capacity = buff_capacity;
     rb->head            = 0;
     rb->tail            = 0;
@@ -69,4 +72,10 @@ bool buffer_is_full(Ring_Buffer *rb)
 bool buffer_is_empty(Ring_Buffer *rb)
 {
     return rb->count == 0;
+}
+
+void buffer_free(Ring_Buffer *rb)
+{
+    free(rb->buffer);
+    rb->buffer = NULL;
 }

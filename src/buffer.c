@@ -39,7 +39,7 @@ int expand_buffer(Buffer *buffer, size_t needed_size)
         fprintf(stderr, "realloc : %s\n", strerror(errno));
         return -1;
     }
-    buffer->buff = temp;;
+    buffer->buff = temp;
     buffer->capacity = buffer->capacity + needed_size;
     buffer->size = buffer->size + needed_size;
 

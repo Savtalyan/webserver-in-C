@@ -12,6 +12,9 @@
 #define NOT_FOUND 404
 #define SERVER_ERR 500
 
+#define READ_BUFFER_SIZE 4096
+
+
 // headers
 typedef struct {
     char host[64];
